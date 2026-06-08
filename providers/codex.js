@@ -1,0 +1,588 @@
+const commands = [
+  {
+    name: 'codex',
+    args: '[prompt]',
+    desc: 'Start interactive full-screen TUI session',
+    detail: 'Launches the Codex CLI in interactive TUI mode. If a prompt is provided it is used as the initial message. Reads AGENTS.md, loads MCP servers, hooks, and skills automatically.',
+    example: 'codex\ncodex "implement OAuth login flow"',
+  },
+  {
+    name: 'codex exec',
+    args: '<prompt>',
+    desc: 'Run a task non-interactively and pipe to stdout',
+    detail: 'Non-interactive mode for scripting and CI. Runs the task, streams output, and exits. Use `-` as the prompt to read from stdin. Combine with --json for structured newline-delimited event output.',
+    example: 'codex exec "add unit tests for auth.ts"\ncat bug.txt | codex exec -',
+  },
+  {
+    name: 'codex exec resume',
+    args: '[prompt]',
+    desc: 'Resume a previous session non-interactively',
+    detail: 'Continues a saved session in non-interactive mode. Use --last to resume the most recent session or pass a SESSION_ID directly. An optional follow-up prompt is sent after resuming.',
+    example: 'codex exec resume --last "now write the tests"\ncodex exec resume 3f2d1c9a "continue"',
+  },
+  {
+    name: 'codex resume',
+    args: '',
+    desc: 'Open picker of recent sessions',
+    detail: 'Displays an interactive picker of recent sessions so you can select one to resume. Use --last to skip the picker and open the most recent session immediately.',
+    example: 'codex resume\ncodex resume --last',
+  },
+  {
+    name: 'codex fork',
+    args: '',
+    desc: 'Branch current conversation into a new thread',
+    detail: 'Creates a new session branched from the current conversation history, leaving the original session intact.',
+    example: 'codex fork',
+  },
+  {
+    name: 'codex login',
+    args: '',
+    desc: 'Authenticate with OpenAI / ChatGPT',
+    detail: 'Opens browser-based OAuth authentication. Use --device-auth for the device code flow when a browser is unavailable, --with-api-key to read an API key from stdin, or --with-access-token for CI access tokens.',
+    example: 'codex login\ncodex login --device-auth\ncodex login --with-api-key',
+  },
+  {
+    name: 'codex login status',
+    args: '',
+    desc: 'Print active authentication mode',
+    detail: 'Displays the current auth mode and exits with status 0 if authenticated, non-zero if not.',
+    example: 'codex login status',
+  },
+  {
+    name: 'codex logout',
+    args: '',
+    desc: 'Sign out and clear credentials',
+    detail: 'Removes locally stored authentication tokens from ~/.codex/auth.json.',
+    example: 'codex logout',
+  },
+  {
+    name: 'codex doctor',
+    args: '',
+    desc: 'Run diagnostics and health checks',
+    detail: 'Diagnoses environment configuration, sandboxing support, auth state, and model connectivity. Use --json for a machine-readable support report or --summary for a condensed overview.',
+    example: 'codex doctor\ncodex doctor --json',
+  },
+  {
+    name: 'codex features',
+    args: '',
+    desc: 'List available feature flags',
+    detail: 'Prints all available feature flags and their current enabled/disabled state.',
+    example: 'codex features',
+  },
+  {
+    name: 'codex update',
+    args: '',
+    desc: 'Update Codex CLI to the latest version',
+    detail: 'Downloads and installs the latest stable release of the Codex CLI.',
+    example: 'codex update',
+  },
+  {
+    name: 'codex mcp',
+    args: '',
+    desc: 'Manage MCP servers',
+    detail: 'Parent command for Model Context Protocol server management. Subcommands: add, get, list, remove, login.',
+    example: 'codex mcp list\ncodex mcp add --url https://mcp.example.com',
+  },
+  {
+    name: 'codex mcp-server',
+    args: '',
+    desc: 'Run Codex as an MCP server over stdio',
+    detail: 'Starts Codex as an MCP server, exposing its capabilities to MCP-compatible clients via stdio transport.',
+    example: 'codex mcp-server',
+  },
+  {
+    name: 'codex cloud',
+    args: '<query>',
+    desc: 'Launch a task in Codex Cloud',
+    detail: 'Sends a task to Codex Cloud for remote execution. Requires --env to specify the target environment. Use --attempts 1–4 for best-of-N parallel runs.',
+    example: 'codex cloud --env prod "fix the login redirect bug"',
+  },
+  {
+    name: 'codex cloud list',
+    args: '',
+    desc: 'List Codex Cloud tasks',
+    detail: 'Lists recent Codex Cloud tasks. Filter by environment with --env, paginate with --cursor, limit results with --limit.',
+    example: 'codex cloud list\ncodex cloud list --env prod --json',
+  },
+  {
+    name: 'codex apply',
+    args: '<task-id>',
+    desc: 'Apply a Codex Cloud task diff locally',
+    detail: 'Downloads the diff produced by a Codex Cloud task and applies it to the local workspace.',
+    example: 'codex apply abc123',
+  },
+  {
+    name: 'codex sandbox',
+    args: '<command...>',
+    desc: 'Execute a command under sandbox policy',
+    detail: 'Runs the given shell command under the active sandbox policy (macOS Seatbelt or Linux Landlock). Useful for testing sandbox constraints before giving them to the model.',
+    example: 'codex sandbox ls -la\ncodex sandbox --permissions-profile strict npm install',
+  },
+  {
+    name: 'codex app-server',
+    args: '',
+    desc: 'Run the Codex app server',
+    detail: 'Starts the Codex app server, which exposes a WebSocket or stdio endpoint for first-party clients such as the ChatGPT desktop app.',
+    example: 'codex app-server --listen ws://127.0.0.1:8765',
+  },
+  {
+    name: 'codex completion',
+    args: '<shell>',
+    desc: 'Generate shell completion scripts',
+    detail: 'Outputs shell completion scripts for the specified shell. Supported shells: bash, zsh, fish, power-shell, elvish.',
+    example: 'codex completion zsh >> ~/.zshrc\ncodex completion bash >> ~/.bashrc',
+  },
+  {
+    name: 'codex plugin marketplace',
+    args: '',
+    desc: 'Manage plugin marketplaces',
+    detail: 'Subcommands: add (register a new marketplace source), upgrade (refresh a Git-backed marketplace).',
+    example: 'codex plugin marketplace add openai/codex-plugins\ncodex plugin marketplace upgrade my-market',
+  },
+  {
+    name: 'codex execpolicy',
+    args: '',
+    desc: 'Evaluate execpolicy rules against a command',
+    detail: 'Tests the configured execpolicy rules against a given command to see whether it would be allowed, denied, or require approval.',
+    example: 'codex execpolicy "npm install"',
+  },
+];
+
+const flags = [
+  {
+    name: '--add-dir',
+    args: '<path>',
+    desc: 'Grant additional directories write access',
+    detail: 'Adds one or more directories to the agent workspace alongside the main working directory.',
+    example: 'codex --add-dir ../shared-lib "refactor imports"',
+  },
+  {
+    name: '--ask-for-approval, -a',
+    args: 'untrusted|on-request|never',
+    desc: 'Control when Codex pauses for approval',
+    detail: 'Sets when the agent pauses before running a shell command: untrusted (default, pause for unknown commands), on-request (only when explicitly asked), never (auto-run everything).',
+    example: 'codex -a never "apply formatting"',
+  },
+  {
+    name: '--cd, -C',
+    args: '<path>',
+    desc: 'Set working directory before starting',
+    detail: 'Changes the workspace root before the agent begins processing. Useful when launching from a different directory.',
+    example: 'codex -C ~/projects/api "list endpoints"',
+  },
+  {
+    name: '--config, -c',
+    args: '<key=value>',
+    desc: 'Override configuration values inline',
+    detail: 'Sets configuration keys at launch time. Values are parsed as TOML if possible, otherwise treated as literal strings. Can be repeated.',
+    example: 'codex -c model=gpt-4.1 -c features.web_search=true "research this"',
+  },
+  {
+    name: '--dangerously-bypass-approvals-and-sandbox, --yolo',
+    args: '',
+    desc: 'Skip all approvals and sandboxing (DANGEROUS)',
+    detail: 'Runs every command without approval prompts or sandbox restrictions. Only use in fully isolated throwaway environments.',
+    example: 'codex --yolo exec "apply all fixes"',
+  },
+  {
+    name: '--dangerously-bypass-hook-trust',
+    args: '',
+    desc: 'Run hooks without persisted trust check',
+    detail: 'Bypasses the persisted hook-trust requirement for this invocation. Use only in trusted CI environments.',
+    example: 'codex --dangerously-bypass-hook-trust exec "run task"',
+  },
+  {
+    name: '--disable',
+    args: '<feature>',
+    desc: 'Force-disable a feature flag',
+    detail: 'Disables the named feature flag for this invocation. Equivalent to -c features.<name>=false.',
+    example: 'codex --disable web_search "explain this file"',
+  },
+  {
+    name: '--enable',
+    args: '<feature>',
+    desc: 'Force-enable a feature flag',
+    detail: 'Enables the named feature flag for this invocation. Equivalent to -c features.<name>=true.',
+    example: 'codex --enable web_search "research latest RFCs"',
+  },
+  {
+    name: '--image, -i',
+    args: '<path[,path...]>',
+    desc: 'Attach image files to the initial prompt',
+    detail: 'Attaches one or more image files to the first message sent to the model.',
+    example: 'codex -i screenshot.png "what is wrong with this UI"',
+  },
+  {
+    name: '--model, -m',
+    args: '<model>',
+    desc: 'Override the configured model',
+    detail: 'Selects a specific model for this session. Common values: gpt-5.4, gpt-5.3-Codex, gpt-4.1, gpt-4.1-mini.',
+    example: 'codex -m gpt-4.1 "review this PR"',
+  },
+  {
+    name: '--no-alt-screen',
+    args: '',
+    desc: 'Disable alternate screen mode for TUI',
+    detail: 'Runs the TUI without switching to the terminal alternate screen buffer. Output stays in the main scrollback.',
+    example: 'codex --no-alt-screen',
+  },
+  {
+    name: '--oss',
+    args: '',
+    desc: 'Use local open-source model provider',
+    detail: 'Routes requests through the local OSS model provider (requires Ollama). Equivalent to -c model_provider=oss.',
+    example: 'codex --oss "explain this function"',
+  },
+  {
+    name: '--profile, -p',
+    args: '<name>',
+    desc: 'Load a named config profile',
+    detail: 'Layers $CODEX_HOME/<name>.config.toml on top of the base user config for this invocation.',
+    example: 'codex -p work "update the changelog"',
+  },
+  {
+    name: '--remote',
+    args: '<ws://|wss://|unix://>',
+    desc: 'Connect TUI to a remote app-server endpoint',
+    detail: 'Attaches the interactive TUI to a running Codex app-server over WebSocket or Unix socket.',
+    example: 'codex --remote ws://localhost:8765',
+  },
+  {
+    name: '--sandbox, -s',
+    args: 'read-only|workspace-write|danger-full-access',
+    desc: 'Select sandbox policy for shell commands',
+    detail: 'Controls filesystem and process restrictions applied to model-generated commands. workspace-write is the safe default for most coding tasks.',
+    example: 'codex -s workspace-write exec "apply patches"',
+  },
+  {
+    name: '--search',
+    args: '',
+    desc: 'Enable live web search',
+    detail: 'Enables real-time web search for the session. Equivalent to -c web_search=live.',
+    example: 'codex --search "what changed in Node.js 22"',
+  },
+  {
+    name: '--strict-config',
+    args: '',
+    desc: 'Error on unrecognized config fields',
+    detail: 'Makes Codex fail at startup if config.toml contains any unrecognized keys.',
+    example: 'codex --strict-config',
+  },
+  {
+    name: '--json (exec)',
+    args: '',
+    desc: 'Emit newline-delimited JSON events (exec only)',
+    detail: 'In exec mode, prints structured newline-delimited JSON events instead of formatted text. Useful for log ingestion and CI pipelines.',
+    example: 'codex exec --json "list todos" | jq .type',
+  },
+  {
+    name: '--output-last-message, -o (exec)',
+    args: '<path>',
+    desc: 'Write assistant final message to file (exec only)',
+    detail: 'Saves the assistant\'s last response to a file in addition to printing it to stdout.',
+    example: 'codex exec -o result.txt "summarize changes"',
+  },
+  {
+    name: '--output-schema (exec)',
+    args: '<path>',
+    desc: 'Enforce JSON Schema on final response (exec only)',
+    detail: 'Provides a JSON Schema file that the assistant\'s final response must conform to.',
+    example: 'codex exec --output-schema schema.json "list endpoints"',
+  },
+  {
+    name: '--ephemeral (exec)',
+    args: '',
+    desc: 'Run without persisting session to disk (exec only)',
+    detail: 'Runs the task without writing session rollout files, keeping no trace after completion.',
+    example: 'codex exec --ephemeral "quick one-off task"',
+  },
+  {
+    name: '--skip-git-repo-check (exec)',
+    args: '',
+    desc: 'Allow running outside a git repository (exec only)',
+    detail: 'Bypasses the check that requires a git repository to be present in the working directory.',
+    example: 'codex exec --skip-git-repo-check "process this file"',
+  },
+];
+
+const slashCommands = [
+  {
+    name: '/model',
+    desc: 'Switch model mid-session',
+    detail: 'Lists available models or switches to a specified model. Common values: gpt-5.4, gpt-5.3-Codex, gpt-4.1, gpt-4.1-mini.',
+    example: '/model\n/model gpt-4.1',
+  },
+  {
+    name: '/fast',
+    desc: 'Toggle fast service tier',
+    detail: 'Turns on or off the fast service tier for lower-latency responses. Use without args to see current status.',
+    example: '/fast\n/fast on',
+  },
+  {
+    name: '/personality',
+    desc: 'Choose communication style',
+    detail: 'Selects the assistant\'s communication style for the session: friendly, pragmatic, or none.',
+    example: '/personality pragmatic',
+  },
+  {
+    name: '/permissions',
+    desc: 'Adjust approval requirements mid-session',
+    detail: 'Changes how Codex handles command approval mid-session without restarting.',
+    example: '/permissions',
+  },
+  {
+    name: '/approve',
+    desc: 'Retry actions denied by auto-review',
+    detail: 'Re-queues and retries the last action that was rejected by the automatic approval system.',
+    example: '/approve',
+  },
+  {
+    name: '/status',
+    desc: 'Show session configuration and token usage',
+    detail: 'Displays current model, sandbox policy, approval mode, and token consumption for the active session.',
+    example: '/status',
+  },
+  {
+    name: '/clear',
+    desc: 'Reset terminal and start a fresh chat',
+    detail: 'Clears the screen and resets conversation history. The session context and config are preserved.',
+    example: '/clear',
+  },
+  {
+    name: '/quit',
+    desc: 'Exit the CLI session',
+    detail: 'Closes the current Codex interactive session. Alias: /exit.',
+    example: '/quit',
+  },
+  {
+    name: '/exit',
+    desc: 'Alias for /quit',
+    detail: 'Equivalent to /quit. Closes the current Codex interactive session.',
+    example: '/exit',
+  },
+  {
+    name: '/plan',
+    desc: 'Switch to planning mode',
+    detail: 'Puts the assistant in planning-only mode. Codex describes what it would do without executing any commands.',
+    example: '/plan\n/plan refactor the auth service',
+  },
+  {
+    name: '/goal',
+    desc: 'Set, pause, resume, or clear task objectives',
+    detail: 'Manages the current task goal. Subcommands: set, pause, resume, clear.',
+    example: '/goal set "migrate database schema"\n/goal pause',
+  },
+  {
+    name: '/fork',
+    desc: 'Branch conversation into a new thread',
+    detail: 'Creates a new session branched from the current conversation without affecting the original.',
+    example: '/fork',
+  },
+  {
+    name: '/side',
+    desc: 'Start an ephemeral side conversation',
+    detail: 'Opens a lightweight ephemeral conversation alongside the main thread. Useful for quick questions without polluting context.',
+    example: '/side what does this regex do?',
+  },
+  {
+    name: '/new',
+    desc: 'Begin a fresh conversation in the same session',
+    detail: 'Starts a new blank conversation while keeping the same session config and MCP connections.',
+    example: '/new',
+  },
+  {
+    name: '/resume',
+    desc: 'Reload a previous saved conversation',
+    detail: 'Opens the conversation picker to resume a prior session. Pass a session ID to skip the picker.',
+    example: '/resume\n/resume 3f2d1c9a',
+  },
+  {
+    name: '/diff',
+    desc: 'Review git changes including untracked files',
+    detail: 'Displays a unified diff of all workspace changes made by the agent in the current session.',
+    example: '/diff',
+  },
+  {
+    name: '/mention',
+    desc: 'Attach specific files to the conversation',
+    detail: 'Pins one or more files into the conversation context so the model can reference them directly.',
+    example: '/mention src/auth.ts',
+  },
+  {
+    name: '/review',
+    desc: 'Request working tree code review',
+    detail: 'Asks the model to analyze and review the current working tree diff against the base branch.',
+    example: '/review',
+  },
+  {
+    name: '/copy',
+    desc: 'Copy the latest response to clipboard',
+    detail: 'Copies the most recent assistant message text to the system clipboard.',
+    example: '/copy',
+  },
+  {
+    name: '/vim',
+    desc: 'Toggle Vim mode for the composer',
+    detail: 'Enables or disables Vim keybindings inside the TUI prompt composer.',
+    example: '/vim',
+  },
+  {
+    name: '/keymap',
+    desc: 'Remap TUI keyboard shortcuts',
+    detail: 'Opens the interactive keybinding editor to customize TUI shortcuts.',
+    example: '/keymap',
+  },
+  {
+    name: '/theme',
+    desc: 'Select syntax-highlighting theme',
+    detail: 'Changes the active syntax highlighting theme for code blocks in the TUI.',
+    example: '/theme',
+  },
+  {
+    name: '/statusline',
+    desc: 'Configure footer status items',
+    detail: 'Customizes what is shown in the TUI footer status bar.',
+    example: '/statusline',
+  },
+  {
+    name: '/title',
+    desc: 'Customize terminal title fields',
+    detail: 'Controls what is displayed in the terminal window title bar.',
+    example: '/title',
+  },
+  {
+    name: '/mcp',
+    desc: 'List available MCP tools',
+    detail: 'Shows connected Model Context Protocol servers and their available tools.',
+    example: '/mcp',
+  },
+  {
+    name: '/apps',
+    desc: 'Browse and insert connectors',
+    detail: 'Opens the connector browser for discovering and inserting available app integrations.',
+    example: '/apps',
+  },
+  {
+    name: '/plugins',
+    desc: 'Manage installed and discoverable plugins',
+    detail: 'Lists installed plugins and allows browsing the marketplace for new ones.',
+    example: '/plugins',
+  },
+  {
+    name: '/skills',
+    desc: 'Select task-specific skill guidance',
+    detail: 'Opens the skills picker to load task-specific instructions or guidance sets.',
+    example: '/skills',
+  },
+  {
+    name: '/memories',
+    desc: 'Configure memory use and generation',
+    detail: 'Manages how Codex reads and writes persistent memory across sessions.',
+    example: '/memories',
+  },
+  {
+    name: '/hooks',
+    desc: 'Review and manage lifecycle hooks',
+    detail: 'Browses configured pre/post lifecycle hooks and their trust status.',
+    example: '/hooks',
+  },
+  {
+    name: '/compact',
+    desc: 'Summarize conversation to preserve tokens',
+    detail: 'Compresses conversation history into a summary, freeing context window space while retaining key intent.',
+    example: '/compact',
+  },
+  {
+    name: '/raw',
+    desc: 'Toggle raw scrollback mode',
+    detail: 'Switches between TUI rendering mode and raw terminal scrollback for easier copy-paste.',
+    example: '/raw',
+  },
+  {
+    name: '/ps',
+    desc: 'Check background terminal status',
+    detail: 'Lists currently running background terminal processes spawned by the agent.',
+    example: '/ps',
+  },
+  {
+    name: '/stop',
+    desc: 'Cancel background work',
+    detail: 'Stops the currently running background task or command.',
+    example: '/stop',
+  },
+  {
+    name: '/debug-config',
+    desc: 'Print configuration layer diagnostics',
+    detail: 'Shows each configuration layer (defaults, user config, profile, flags) and the merged effective config.',
+    example: '/debug-config',
+  },
+  {
+    name: '/feedback',
+    desc: 'Submit logs to maintainers',
+    detail: 'Bundles session logs and sends a feedback report to the Codex maintainers.',
+    example: '/feedback',
+  },
+  {
+    name: '/logout',
+    desc: 'Clear local credentials',
+    detail: 'Signs out from the current authentication session and removes stored tokens.',
+    example: '/logout',
+  },
+  {
+    name: '/init',
+    desc: 'Generate AGENTS.md scaffold',
+    detail: 'Creates an AGENTS.md file in the current workspace with a starter template for agent instructions.',
+    example: '/init',
+  },
+  {
+    name: '/ide',
+    desc: 'Include IDE context in next prompt',
+    detail: 'Attaches the current IDE state (open files, cursor position) to the next message.',
+    example: '/ide',
+  },
+  {
+    name: '/agent',
+    desc: 'Switch active agent thread',
+    detail: 'Switches to a different active agent thread within the current session.',
+    example: '/agent',
+  },
+];
+
+// OpenAI brand — deep black backgrounds with signature green accent #10A37F
+// Inspired by openai.com's minimal dark design and ChatGPT's green brand color
+const theme = {
+  bg:           [  8,  10,  10],  // near-black with green undertone
+  bgPanel:      [ 12,  18,  17],  // very dark teal-black panel
+  bgSelected:   [ 16, 163, 127],  // OpenAI green
+  bgTooltip:    [ 10,  14,  13],  // deep dark tooltip
+  bgHeader:     [ 16, 163, 127],  // OpenAI green header
+  fgBase:       [210, 230, 225],  // cool near-white
+  fgDim:        [ 65,  90,  85],  // muted teal-gray
+  fgAccent:     [ 80, 200, 160],  // lighter OpenAI green
+  fgAccent2:    [130, 220, 190],  // pale mint accent
+  fgSelected:   [255, 255, 255],  // white on green selection
+  fgHeader:     [ 10,  25,  20],  // very dark text on green header
+  fgCmd:        [ 80, 200, 160],  // green command
+  fgFlag:       [100, 185, 155],  // muted green flag
+  fgExample:    [160, 230, 205],  // pale mint example
+  fgTooltipHd:  [ 80, 200, 160],
+  fgTooltipBdy: [165, 205, 195],
+  fgTooltipEx:  [160, 230, 205],
+  fgSearch:     [200, 255, 230],  // bright mint search highlight
+  fgBorder:     [ 25,  55,  48],  // dark teal border
+};
+
+export default {
+  id: 'codex',
+  displayName: 'Codex CLI',
+  bin: 'codex',
+  reference: [
+    'https://openai.github.io/codex/reference/',
+    'https://openai.github.io/codex/',
+    'https://github.com/openai/codex',
+  ],
+  commands,
+  flags,
+  slashCommands,
+  theme,
+};

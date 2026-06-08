@@ -1,33 +1,33 @@
 import js from '@eslint/js';
 import globals from 'globals';
 import {
- defineConfig 
+  defineConfig
 } from 'eslint/config';
 
 export default defineConfig([
   {
     files: ['**/*.{js,mjs,cjs}'],
     plugins: {
- js 
-},
+      js
+    },
     extends: ['js/recommended'],
     languageOptions: {
- globals: globals.browser 
-},
+      globals: globals.browser
+    },
     rules: {
       'quotes': ['error', 'single'],
       'semi': ['error', 'always'],
       'no-unused-vars': ['error', {
- 'argsIgnorePattern': '^_' 
-}],
+        'argsIgnorePattern': '^_'
+      }],
       'function-paren-newline': ['error', 'multiline'],
       'object-property-newline': ['error', {
- 'allowAllPropertiesOnSameLine': false 
-}],
+        'allowAllPropertiesOnSameLine': false
+      }],
       'object-curly-newline': ['error', {
- 'multiline': true,
-'minProperties': 1 
-}],
+        'multiline': true,
+        'minProperties': 1
+      }],
     },
   },
 ]);

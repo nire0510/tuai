@@ -16,6 +16,7 @@ Supported providers:
 - `cursor`
 - `antigravity`
 - `copilot`
+- `codex`
 
 ## Features
 
@@ -83,6 +84,7 @@ You can also launch:
 tuai cursor
 tuai antigravity
 tuai copilot
+tuai codex
 ```
 
 ## Why tuai
@@ -142,6 +144,7 @@ Provider data is loaded from:
 - `providers/cursor.js`
 - `providers/antigravity.js`
 - `providers/copilot.js`
+- `providers/codex.js`
 
 ## Provider Docs Auto-Sync Skill
 

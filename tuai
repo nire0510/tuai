@@ -8,8 +8,9 @@ import claude from './providers/claude.js';
 import cursor from './providers/cursor.js';
 import antigravity from './providers/antigravity.js';
 import copilot from './providers/copilot.js';
+import codex from './providers/codex.js';
 
-const PROVIDERS = { claude, cursor, antigravity, copilot };
+const PROVIDERS = { claude, cursor, antigravity, copilot, codex };
 
 function printUsageAndExit() {
   const names = Object.keys(PROVIDERS).join(', ');
