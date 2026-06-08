@@ -93,6 +93,15 @@ If you use more than one AI CLI, context switching gets expensive:
 
 `tuai` gives you one place to discover what each tool supports, build commands confidently, and execute them fast.
 
+## GitHub Pages
+
+This repository includes a project website in `docs/`, deployed automatically via GitHub Actions.
+
+- Workflow: `.github/workflows/pages.yml`
+- Source: `docs/index.html` and `docs/styles.css`
+
+After pushing to `main` or `master`, GitHub will publish the site from the workflow run.
+
 ## Quick workflow
 
 1. Launch a provider (`tuai claude`, `tuai cursor`, etc.).
@@ -130,3 +139,24 @@ Provider data is loaded from:
 - `providers/claude.js`
 - `providers/cursor.js`
 - `providers/antigravity.js`
+
+## Provider Docs Auto-Sync Skill
+
+This repository includes a Claude Code skill at `.claude/skills/provider-doc-sync/SKILL.md`.
+
+The skill's purpose:
+
+- read each provider file in `providers/`
+- follow the URLs in each provider's `reference` field
+- verify commands, flags, and slash commands are still aligned with current docs
+- update provider files when drift is found
+
+Automation workflow:
+
+- `.github/workflows/provider-doc-sync.yml` runs weekly and on manual dispatch
+- it executes Claude Code with the provider-doc-sync skill prompt
+- if provider files changed, it opens a PR automatically
+
+Required secret for automation:
+
+- `CLAUDE_CODE_OAUTH_TOKEN` (generate with `claude setup-token`)

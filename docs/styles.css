@@ -1,0 +1,278 @@
+:root {
+  --bg: #f9f6ef;
+  --ink: #111111;
+  --muted: #4b4b4b;
+  --primary: #ef6f36;
+  --primary-dark: #cf5621;
+  --card: #fffdf8;
+  --line: #1f1f1f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 5% 10%, #ffd2c0 0, transparent 38%),
+    radial-gradient(circle at 95% 90%, #b7f0df 0, transparent 38%),
+    var(--bg);
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.bg-shape {
+  position: fixed;
+  border-radius: 999px;
+  filter: blur(4px);
+  pointer-events: none;
+  opacity: 0.35;
+}
+
+.bg-shape-left {
+  width: 220px;
+  height: 220px;
+  background: #ffc58f;
+  top: -40px;
+  left: -80px;
+}
+
+.bg-shape-right {
+  width: 280px;
+  height: 280px;
+  background: #8cd1bd;
+  right: -100px;
+  bottom: -60px;
+}
+
+.topbar,
+main,
+footer {
+  width: min(1100px, 92vw);
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.2rem 0;
+}
+
+.brand {
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-size: 1.15rem;
+}
+
+nav {
+  display: flex;
+  gap: 1rem;
+}
+
+nav a {
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+}
+
+nav a:hover {
+  border-bottom-color: var(--ink);
+}
+
+.hero {
+  margin-top: 2.4rem;
+  animation: rise 700ms ease-out both;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+h1 {
+  margin: 0.2rem 0 0.8rem;
+  font-size: clamp(2rem, 5vw, 4.2rem);
+  line-height: 1.02;
+  max-width: 11.5ch;
+}
+
+.lead {
+  max-width: 58ch;
+  color: #1f1f1f;
+  font-size: 1.08rem;
+}
+
+.cta-row {
+  display: flex;
+  gap: 0.85rem;
+  margin-top: 1.3rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.72rem 1rem;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 700;
+  transition: transform 220ms ease, box-shadow 220ms ease, background 220ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 7px 16px rgb(239 111 54 / 35%);
+}
+
+.btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.btn-ghost {
+  border: 2px solid var(--line);
+  color: var(--ink);
+}
+
+.terminal-card {
+  margin-top: 2.2rem;
+  background: #0f0f0f;
+  color: #e8e8e8;
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgb(0 0 0 / 24%);
+  overflow: hidden;
+  animation: rise 850ms ease-out both;
+}
+
+.terminal-head {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid #2b2b2b;
+}
+
+.terminal-head span {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.terminal-head span:nth-child(1) {
+  background: #ff5f57;
+}
+
+.terminal-head span:nth-child(2) {
+  background: #febc2e;
+}
+
+.terminal-head span:nth-child(3) {
+  background: #28c840;
+}
+
+pre {
+  margin: 0;
+  padding: 1.1rem;
+  overflow-x: auto;
+}
+
+code {
+  font-family: "IBM Plex Mono", "Menlo", monospace;
+  font-size: 0.93rem;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.features article {
+  padding: 1rem;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  animation: rise 900ms ease-out both;
+}
+
+.features h2,
+.workflow h2 {
+  margin: 0;
+  font-size: 1.06rem;
+}
+
+.features p {
+  margin: 0.55rem 0 0;
+  color: #303030;
+}
+
+.workflow {
+  margin-top: 1.6rem;
+  border: 2px dashed #444;
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  background: #fffcf4;
+  animation: rise 980ms ease-out both;
+}
+
+.workflow ol {
+  margin: 0.8rem 0 0;
+  padding-left: 1.2rem;
+}
+
+footer {
+  padding: 2rem 0 2.4rem;
+  color: var(--muted);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 860px) {
+  .features {
+    grid-template-columns: 1fr;
+  }
+
+  nav {
+    gap: 0.7rem;
+  }
+
+  .hero {
+    margin-top: 1.4rem;
+  }
+
+  .lead {
+    font-size: 1rem;
+  }
+}
