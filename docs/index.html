@@ -11,31 +11,33 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="bg-shape bg-shape-left" aria-hidden="true"></div>
-    <div class="bg-shape bg-shape-right" aria-hidden="true"></div>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="bg-aurora bg-aurora-cyan" aria-hidden="true"></div>
+    <div class="bg-aurora bg-aurora-blue" aria-hidden="true"></div>
 
     <header class="topbar">
       <a class="brand" href="#">tuai</a>
       <nav aria-label="Primary">
         <a href="#features">Features</a>
-        <a href="#workflow">Workflow</a>
+        <a href="#providers">Providers</a>
+        <a href="#install">Install</a>
         <a href="https://github.com/nire0510/tuai" target="_blank" rel="noreferrer">GitHub</a>
       </nav>
     </header>
 
     <main>
       <section class="hero">
-        <p class="eyebrow">Terminal UX, upgraded</p>
-        <h1>One command palette for every AI CLI you use.</h1>
+        <p class="eyebrow">TECHNICAL COMMAND CENTER</p>
+        <h1>Ship faster with one AI command palette, not three different CLIs.</h1>
         <p class="lead">
-          tuai gives Claude, Cursor, and Antigravity a shared, searchable interface so you can stop
-          memorizing provider-specific command syntax.
+          Stop losing momentum to command recall. tuai gives you a single high-speed interface for
+          Claude, Cursor, and Antigravity so you can discover, compose, and execute in seconds.
         </p>
         <div class="cta-row">
           <a class="btn btn-primary" href="https://www.npmjs.com/package/@nire0510/tuai" target="_blank" rel="noreferrer">
@@ -45,50 +47,83 @@
             View source
           </a>
         </div>
+        <div class="status-row" aria-label="project stats">
+          <span>Built for daily AI users</span>
+          <span>Install in one command</span>
+          <span>Instant command execution</span>
+        </div>
       </section>
 
-      <section class="terminal-card" aria-label="Command example">
-        <div class="terminal-head">
-          <span></span><span></span><span></span>
-        </div>
-        <pre><code>$ npm install -g @nire0510/tuai
+      <section class="console-wrap" aria-label="Command example">
+        <article class="terminal-card">
+          <div class="terminal-head">
+            <span></span><span></span><span></span>
+            <p>terminal/session/tuai</p>
+          </div>
+          <pre><code>$ npm install -g @nire0510/tuai
 $ tuai claude
 
 provider: claude
-tab: Commands
-search: /code review
+tab: slash
+search: /refactor
 
-selected: /review --focus reliability</code></pre>
+selected: /review --focus reliability --format diff
+buffer: claude /review --focus reliability --format diff
+
+$ X</code></pre>
+        </article>
+        <aside class="signal-card">
+          <h2>Why teams adopt tuai</h2>
+          <ul>
+            <li>Replace CLI memorization with fast discovery</li>
+            <li>Keep your hands on the keyboard and stay in flow</li>
+            <li>Cut command mistakes before they happen</li>
+          </ul>
+        </aside>
       </section>
 
       <section id="features" class="features">
         <article>
-          <h2>Unified command discovery</h2>
-          <p>Browse commands, flags, and slash commands in one navigable catalog.</p>
+          <h2>Find what you need now</h2>
+          <p>Search every command surface instantly instead of digging through docs and help pages.</p>
         </article>
         <article>
-          <h2>Fast command building</h2>
-          <p>Compose executable CLI commands with live search and keyboard-only flow.</p>
+          <h2>Build commands with confidence</h2>
+          <p>Compose real executable commands with less friction and fewer syntax errors.</p>
         </article>
         <article>
-          <h2>Provider-aware catalog</h2>
-          <p>Switch contexts instantly between Claude, Cursor, and Antigravity.</p>
+          <h2>Switch providers, keep velocity</h2>
+          <p>Use one consistent interface as you jump between Claude, Cursor, and Antigravity.</p>
         </article>
       </section>
 
-      <section id="workflow" class="workflow">
-        <h2>Quick workflow</h2>
-        <ol>
-          <li>Launch a provider: <code>tuai claude</code> or <code>tuai cursor</code>.</li>
-          <li>Search by typing <code>/</code> and filter commands or flags.</li>
-          <li>Press <code>Enter</code> to append selections to your command buffer.</li>
-          <li>Press <code>X</code> to execute instantly.</li>
-        </ol>
+      <section id="providers" class="providers">
+        <h2>Providers</h2>
+        <div class="provider-grid">
+          <article>
+            <h3>Claude</h3>
+            <p>Structured slash workflows and command exploration.</p>
+          </article>
+          <article>
+            <h3>Cursor</h3>
+            <p>Fast flag lookup and command composition from one panel.</p>
+          </article>
+          <article>
+            <h3>Antigravity</h3>
+            <p>Consistent browsing and execution with the same keymap.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="install" class="install">
+        <h2>Install now and run your first session</h2>
+        <pre><code>npm install -g @nire0510/tuai
+tuai claude</code></pre>
       </section>
     </main>
 
     <footer>
-      <p>Built for people who live in the terminal.</p>
+      <p>tuai | modern command orchestration for AI-native terminals</p>
     </footer>
   </body>
 </html>
