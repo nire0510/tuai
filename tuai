@@ -405,6 +405,30 @@ function handleKey(key) {
   }
 }
 
+function parseArgs(cmd) {
+  const args = [];
+  let current = '';
+  let quote = null;
+  for (let i = 0; i < cmd.length; i++) {
+    const ch = cmd[i];
+    if (quote) {
+      if (ch === quote) {
+        quote = null;
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === ' ' || ch === '\t') {
+      if (current) { args.push(current); current = ''; }
+    } else {
+      current += ch;
+    }
+  }
+  if (current) args.push(current);
+  return args;
+}
+
 function executeCmdBuffer() {
   // Leave alt screen, run command
   out(ansi.altLeave + ansi.showCursor);
@@ -414,7 +438,7 @@ function executeCmdBuffer() {
   const cmd = state.cmdBuffer.trim();
   console.log('\n' + C.fgAccent + '⚡ Running: ' + C.reset + cmd + '\n');
 
-  const parts = cmd.split(/\s+/);
+  const parts = parseArgs(cmd);
   const bin = parts[0];
   const args = parts.slice(1);
 
@@ -423,14 +447,7 @@ function executeCmdBuffer() {
     shell: false,
   });
 
-  console.log('\n' + C.fgDim + '─── Press any key to return to tuai ───' + C.reset);
-  process.stdin.setRawMode(true);
-  process.stdin.resume();
-  process.stdin.once('data', () => {
-    state.cmdBuffer = '';
-    out(ansi.altEnter);
-    render();
-  });
+  process.exit(0);
 }
 
 function exit() {
