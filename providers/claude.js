@@ -87,8 +87,22 @@ const commands = [
     name: 'claude auto-mode defaults',
     args: '',
     desc: 'Print built-in auto-mode classifier rules',
-    detail: 'Outputs the built-in auto-mode permission classifier rules as JSON. Use "auto-mode config" to see effective config with your settings applied on top.',
+    detail: 'Outputs the built-in auto-mode permission classifier rules (environment, allow, soft_deny, hard_deny) as JSON. Use "auto-mode config" to see effective config with your settings applied on top.',
     example: 'claude auto-mode defaults > rules.json'
+  },
+  {
+    name: 'claude auto-mode config',
+    args: '',
+    desc: 'Show effective auto-mode config with your settings applied',
+    detail: 'Prints what the auto-mode classifier actually uses as JSON, with your settings applied where set and built-in defaults otherwise. "$defaults" is expanded in place. Run after saving settings to confirm the effective rules.',
+    example: 'claude auto-mode config'
+  },
+  {
+    name: 'claude auto-mode critique',
+    args: '',
+    desc: 'Get AI feedback on your custom auto-mode rules',
+    detail: 'Reviews your custom allow, soft_deny, and hard_deny rules and flags entries that are ambiguous, redundant, or likely to cause false positives.',
+    example: 'claude auto-mode critique'
   },
   {
     name: 'claude daemon status',
@@ -119,11 +133,88 @@ const commands = [
     example: 'claude mcp add\nclaude mcp list'
   },
   {
+    name: 'claude mcp add',
+    args: '[options] <name> [-- <cmd> [args...]]',
+    desc: 'Add an MCP server',
+    detail: 'Add an MCP server by transport type. Use --transport http|sse|stdio (default: stdio). Use --scope local|project|user to control where it is saved. Use --env KEY=value for environment variables. For stdio servers, separate server args with --.',
+    example: 'claude mcp add --transport http notion https://mcp.notion.com/mcp\nclaude mcp add --transport stdio airtable -- npx -y airtable-mcp-server'
+  },
+  {
+    name: 'claude mcp add-json',
+    args: '<name> \'<json>\'',
+    desc: 'Add an MCP server from a JSON config string',
+    detail: 'Add an MCP server by passing its full configuration as a JSON string. Useful for WebSocket servers and complex configs that the --transport flag does not cover.',
+    example: 'claude mcp add-json weather-api \'{"type":"http","url":"https://api.weather.com/mcp"}\''
+  },
+  {
+    name: 'claude mcp list',
+    args: '',
+    desc: 'List configured MCP servers',
+    detail: 'Prints all configured MCP servers and their status. Servers awaiting approval from .mcp.json appear as "Pending approval".',
+    example: 'claude mcp list'
+  },
+  {
+    name: 'claude mcp get',
+    args: '<name>',
+    desc: 'Get details for one MCP server',
+    detail: 'Shows the full configuration and current status of a specific MCP server. Pending and rejected project-scoped servers are also shown.',
+    example: 'claude mcp get github'
+  },
+  {
+    name: 'claude mcp remove',
+    args: '<name>',
+    desc: 'Remove an MCP server',
+    detail: 'Deletes the named MCP server from configuration. Use --scope to target the correct scope when the same name exists in multiple scopes.',
+    example: 'claude mcp remove github'
+  },
+  {
+    name: 'claude mcp serve',
+    args: '',
+    desc: 'Start Claude Code as a stdio MCP server',
+    detail: 'Exposes Claude Code itself as an MCP server over stdio. Use this to connect Claude Code as a tool inside Claude Desktop or other MCP clients.',
+    example: 'claude mcp serve'
+  },
+  {
     name: 'claude plugin',
     args: '',
     desc: 'Manage Claude Code plugins',
-    detail: 'Install, remove, and list plugins from the official marketplace or custom registries. Alias: "claude plugins".',
+    detail: 'Install, remove, and list plugins from the official marketplace or custom registries. Alias: "claude plugins". Run with no argument to open the interactive plugin menu.',
     example: 'claude plugin install code-review@claude-plugins-official'
+  },
+  {
+    name: 'claude plugin install',
+    args: '<plugin> [options]',
+    desc: 'Install a plugin from a marketplace',
+    detail: 'Install a plugin by name, optionally qualified as "name@marketplace". Use --scope user|project|local to control where it is installed (default: user).',
+    example: 'claude plugin install code-review@claude-plugins-official\nclaude plugin install formatter@my-marketplace --scope project'
+  },
+  {
+    name: 'claude plugin uninstall',
+    args: '<plugin> [options]',
+    desc: 'Uninstall a plugin',
+    detail: 'Remove an installed plugin. Aliases: remove, rm. Use --keep-data to preserve the plugin\'s persistent data directory. Use --prune to also remove auto-installed dependencies.',
+    example: 'claude plugin uninstall formatter@my-marketplace\nclaude plugin remove my-tool --keep-data'
+  },
+  {
+    name: 'claude plugin list',
+    args: '[options]',
+    desc: 'List installed plugins',
+    detail: 'Prints installed plugins with their version, source marketplace, and enable status. Use --json for machine-readable output, --available to also show plugins available from marketplaces.',
+    example: 'claude plugin list\nclaude plugin list --json'
+  },
+  {
+    name: 'claude plugin enable',
+    args: '<plugin> [options]',
+    desc: 'Enable a disabled plugin',
+    detail: 'Enable a plugin that was previously disabled. Also enables any declared dependencies transitively. Use --scope to target the correct scope.',
+    example: 'claude plugin enable my-tool@my-marketplace'
+  },
+  {
+    name: 'claude plugin disable',
+    args: '<plugin> [options]',
+    desc: 'Disable a plugin without uninstalling it',
+    detail: 'Disable a plugin so it no longer loads, without removing it. Fails if another enabled plugin depends on it. Use --scope to target the correct scope.',
+    example: 'claude plugin disable my-tool@my-marketplace'
   },
   {
     name: 'claude project purge',
