@@ -15,6 +15,7 @@ Supported providers:
 - `claude`
 - `cursor`
 - `antigravity`
+- `copilot`
 
 ## Features
 
@@ -81,6 +82,7 @@ You can also launch:
 ```bash
 tuai cursor
 tuai antigravity
+tuai copilot
 ```
 
 ## Why tuai
@@ -104,7 +106,7 @@ After pushing to `main` or `master`, GitHub will publish the site from the workf
 
 ## Quick workflow
 
-1. Launch a provider (`tuai claude`, `tuai cursor`, etc.).
+1. Launch a provider (`tuai claude`, `tuai cursor`, `tuai copilot`, etc.).
 2. Use `/` to search commands or flags.
 3. Press `Enter` to append selected items to the command buffer.
 4. Type any extra arguments.
@@ -139,6 +141,7 @@ Provider data is loaded from:
 - `providers/claude.js`
 - `providers/cursor.js`
 - `providers/antigravity.js`
+- `providers/copilot.js`
 
 ## Provider Docs Auto-Sync Skill
 

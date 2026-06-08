@@ -6,8 +6,9 @@ import { spawnSync } from 'child_process';
 import claude from './providers/claude.js';
 import cursor from './providers/cursor.js';
 import antigravity from './providers/antigravity.js';
+import copilot from './providers/copilot.js';
 
-const PROVIDERS = { claude, cursor, antigravity };
+const PROVIDERS = { claude, cursor, antigravity, copilot };
 
 function printUsageAndExit() {
   const names = Object.keys(PROVIDERS).join(', ');
