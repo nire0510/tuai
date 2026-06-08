@@ -1,0 +1,468 @@
+#!/usr/bin/env node
+
+import readline from 'readline';
+import { spawnSync } from 'child_process';
+
+import claude from './providers/claude.js';
+import cursor from './providers/cursor.js';
+import antigravity from './providers/antigravity.js';
+
+const PROVIDERS = { claude, cursor, antigravity };
+
+function printUsageAndExit() {
+  const names = Object.keys(PROVIDERS).join(', ');
+  console.error(`Usage: tuai <provider>\n\nProviders: ${names}`);
+  process.exit(1);
+}
+
+const args = process.argv.slice(2);
+if (args.length !== 1) {
+  printUsageAndExit();
+}
+
+const providerName = args[0].toLowerCase();
+const provider = PROVIDERS[providerName];
+if (!provider) {
+  printUsageAndExit();
+}
+
+// ─── ANSI helpers ────────────────────────────────────────────────────────────
+const ESC = '\x1b';
+const CSI = ESC + '[';
+const ansi = {
+  clear: CSI + '2J',
+  home: CSI + 'H',
+  hideCursor: CSI + '?25l',
+  showCursor: CSI + '?25h',
+  altEnter: ESC + '[?1049h',
+  altLeave: ESC + '[?1049l',
+  reset: ESC + '[0m',
+  bold: ESC + '[1m',
+  dim: ESC + '[2m',
+  italic: ESC + '[3m',
+  underline: ESC + '[4m',
+  move: (r, c) => CSI + r + ';' + c + 'H',
+  fg: (r, g, b) => ESC + '[38;2;' + r + ';' + g + ';' + b + 'm',
+  bg: (r, g, b) => ESC + '[48;2;' + r + ';' + g + ';' + b + 'm',
+  clearLine: CSI + '2K',
+  eraseLine: CSI + 'K',
+  saveCursor: ESC + '7',
+  restCursor: ESC + '8',
+};
+
+// ─── Color palette (built from provider.theme) ────────────────────────────────
+const t = provider.theme;
+const C = {
+  bg: ansi.bg(...t.bg),
+  bgPanel: ansi.bg(...t.bgPanel),
+  bgSelected: ansi.bg(...t.bgSelected),
+  bgTooltip: ansi.bg(...t.bgTooltip),
+  bgHeader: ansi.bg(...t.bgHeader),
+  fgBase: ansi.fg(...t.fgBase),
+  fgDim: ansi.fg(...t.fgDim),
+  fgAccent: ansi.fg(...t.fgAccent),
+  fgAccent2: ansi.fg(...t.fgAccent2),
+  fgSelected: ansi.fg(...t.fgSelected),
+  fgHeader: ansi.fg(...t.fgHeader),
+  fgCmd: ansi.fg(...t.fgCmd),
+  fgFlag: ansi.fg(...t.fgFlag),
+  fgExample: ansi.fg(...t.fgExample),
+  fgTooltipHd: ansi.fg(...t.fgTooltipHd),
+  fgTooltipBdy: ansi.fg(...t.fgTooltipBdy),
+  fgTooltipEx: ansi.fg(...t.fgTooltipEx),
+  fgSearch: ansi.fg(...t.fgSearch),
+  fgBorder: ansi.fg(...t.fgBorder),
+  reset: ansi.reset,
+};
+
+// ─── Tab categories ───────────────────────────────────────────────────────────
+const TABS = [
+  { label: 'Commands', items: provider.commands, color: C.fgCmd },
+  { label: 'Flags', items: provider.flags, color: C.fgFlag },
+  { label: 'Slash /', items: provider.slashCommands, color: C.fgAccent },
+];
+
+// ─── Terminal state ───────────────────────────────────────────────────────────
+let W = process.stdout.columns || 120;
+let H = process.stdout.rows || 36;
+
+process.stdout.on('resize', () => {
+  W = process.stdout.columns || 120;
+  H = process.stdout.rows || 36;
+  render();
+});
+
+// ─── App state ────────────────────────────────────────────────────────────────
+const state = {
+  tabIdx: 0,
+  selectedIdx: 0,
+  searchStr: '',
+  searchMode: false,
+  cmdBuffer: '',    // built-up command line
+  showHelp: false,
+};
+
+function activeItems() {
+  const items = TABS[state.tabIdx].items;
+  if (!state.searchStr) return items;
+  const q = state.searchStr.toLowerCase();
+  return items.filter(i =>
+    i.name.toLowerCase().includes(q) ||
+    i.desc.toLowerCase().includes(q)
+  );
+}
+
+// ─── Drawing primitives ───────────────────────────────────────────────────────
+const out = (s) => process.stdout.write(s);
+
+function fillLine(row, col, len, bgColor, char = ' ') {
+  out(ansi.move(row, col) + bgColor + char.repeat(len) + C.reset);
+}
+
+function drawBox(r, c, h, w, bgColor, borderColor) {
+  const hLine = '─'.repeat(w - 2);
+  out(borderColor + bgColor);
+  out(ansi.move(r, c) + '╭' + hLine + '╮');
+  for (let i = 1; i < h - 1; i++) {
+    out(ansi.move(r + i, c) + '│' + bgColor + ' '.repeat(w - 2) + borderColor + '│');
+  }
+  out(ansi.move(r + h - 1, c) + '╰' + hLine + '╯');
+  out(C.reset);
+}
+
+function clip(str, maxLen) {
+  if (!str) return '';
+  return str.length > maxLen ? str.slice(0, maxLen - 1) + '…' : str;
+}
+
+function wrapText(text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const word of words) {
+    if ((line + ' ' + word).trim().length > maxW) {
+      if (line) lines.push(line);
+      line = word;
+    } else {
+      line = (line ? line + ' ' : '') + word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function render() {
+  out(ansi.hideCursor);
+  out(C.bg + ansi.clear + ansi.home);
+
+  const items = activeItems();
+  const selIdx = Math.min(state.selectedIdx, items.length - 1);
+  const selItem = items[selIdx];
+  const tabColor = TABS[state.tabIdx].color;
+
+  // ── Header bar ──────────────────────────────────────────────────────────────
+  const headerBg = C.bgHeader;
+  fillLine(1, 1, W, headerBg);
+  out(ansi.move(1, 2) + headerBg + C.fgHeader + ansi.bold +
+    '  ⚡ tuai  ' + ansi.reset +
+    headerBg + C.fgHeader + ansi.dim + `  ${provider.displayName} Autocomplete  ·  ↑↓ navigate  ·  Tab switch  ·  / search  ·  Enter compose  ·  q quit` +
+    C.reset);
+
+  // ── Tabs ────────────────────────────────────────────────────────────────────
+  let tabX = 2;
+  for (let i = 0; i < TABS.length; i++) {
+    const t = TABS[i];
+    const active = i === state.tabIdx;
+    const bg = active ? C.bgPanel : C.bg;
+    const fg = active ? t.color : C.fgDim;
+    const label = ` ${t.label} (${t.items.length}) `;
+    out(ansi.move(2, tabX) + bg + fg + (active ? ansi.bold : ansi.dim) + label + C.reset);
+    tabX += label.length;
+    if (i < TABS.length - 1) out(C.fgBorder + C.bg + '│' + C.reset);
+  }
+  fillLine(3, 1, W, C.bgPanel, '─');
+
+  // ── Search bar ──────────────────────────────────────────────────────────────
+  const searchBarRow = 4;
+  out(ansi.move(searchBarRow, 2) + C.bgPanel + C.fgDim + ' 🔍 ');
+  if (state.searchMode || state.searchStr) {
+    out(C.fgSearch + ansi.bold + state.searchStr);
+    if (state.searchMode) out(C.fgAccent + '█');
+  } else {
+    out(C.fgDim + ansi.italic + 'Type / to search…');
+  }
+  out(C.reset);
+  fillLine(5, 1, W, C.bgPanel, '─');
+
+  // ── List panel ──────────────────────────────────────────────────────────────
+  const listTop = 6;
+  const listH = H - listTop - 4;   // leave bottom for cmdline + status
+  const listW = Math.floor(W * 0.52);
+  const tooltipX = listW + 3;
+  const tooltipW = W - tooltipX - 1;
+
+  // scrolling
+  let scrollOff = 0;
+  if (items.length > listH) {
+    scrollOff = Math.max(0, selIdx - Math.floor(listH / 2));
+    scrollOff = Math.min(scrollOff, items.length - listH);
+  }
+
+  for (let i = 0; i < listH; i++) {
+    const itemIdx = i + scrollOff;
+    const row = listTop + i;
+    if (itemIdx >= items.length) {
+      fillLine(row, 1, listW, C.bg);
+      continue;
+    }
+    const item = items[itemIdx];
+    const isActive = itemIdx === selIdx;
+    const bg = isActive ? C.bgSelected : C.bg;
+    const fgName = isActive ? C.fgSelected : tabColor;
+    const fgDesc = isActive ? ansi.fg(200, 230, 255) : C.fgDim;
+
+    fillLine(row, 1, listW, bg);
+
+    const prefix = isActive ? '▶ ' : '  ';
+    const nameStr = prefix + item.name + (item.args ? ' ' + item.args : '');
+    const nameClip = clip(nameStr, Math.floor(listW * 0.5));
+    const descClip = clip(item.desc, listW - nameClip.length - 3);
+
+    out(ansi.move(row, 1) + bg + fgName + ansi.bold + nameClip + C.reset);
+    out(bg + C.fgBorder + ' │ ' + C.reset);
+    out(bg + fgDesc + descClip + C.reset);
+    fillLine(row, 1 + nameClip.length + 3 + descClip.length, listW - nameClip.length - 3 - descClip.length, bg);
+  }
+
+  // Scrollbar indicator
+  if (items.length > listH) {
+    const ratio = scrollOff / (items.length - listH);
+    const sbRow = Math.round(listTop + ratio * (listH - 1));
+    out(ansi.move(sbRow, listW + 1) + C.fgAccent + '┃' + C.reset);
+  }
+
+  // ── Tooltip panel (right side) ──────────────────────────────────────────────
+  if (selItem && tooltipW > 20) {
+    const tp = listTop;
+    const tH = listH;
+
+    drawBox(tp, tooltipX, tH, tooltipW, C.bgTooltip, C.fgBorder);
+
+    let tRow = tp + 1;
+    const innerW = tooltipW - 4;
+
+    // Name
+    out(ansi.move(tRow, tooltipX + 2) + C.bgTooltip + tabColor + ansi.bold +
+      clip(selItem.name, innerW) + C.reset);
+    tRow++;
+
+    if (selItem.args) {
+      out(ansi.move(tRow, tooltipX + 2) + C.bgTooltip + C.fgDim + 'args: ' + C.fgAccent2 + selItem.args + C.reset);
+      tRow++;
+    }
+
+    // Divider
+    out(ansi.move(tRow, tooltipX + 1) + C.fgBorder + '├' + '─'.repeat(tooltipW - 2) + '┤' + C.reset);
+    tRow++;
+
+    // Description headline
+    out(ansi.move(tRow, tooltipX + 2) + C.bgTooltip + C.fgTooltipHd + ansi.bold + 'Description' + C.reset);
+    tRow++;
+
+    const detailLines = wrapText(selItem.detail || selItem.desc, innerW);
+    for (const l of detailLines) {
+      if (tRow >= tp + tH - 4) break;
+      out(ansi.move(tRow, tooltipX + 2) + C.bgTooltip + C.fgTooltipBdy + l + C.reset);
+      tRow++;
+    }
+
+    if (selItem.example && tRow < tp + tH - 3) {
+      tRow++;
+      out(ansi.move(tRow, tooltipX + 2) + C.bgTooltip + C.fgTooltipHd + ansi.bold + 'Example' + C.reset);
+      tRow++;
+      const exLines = selItem.example.split('\n');
+      for (const el of exLines) {
+        if (tRow >= tp + tH - 1) break;
+        const elClipped = clip(el, innerW);
+        out(ansi.move(tRow, tooltipX + 2) + C.bgTooltip + C.fgTooltipEx + elClipped + C.reset);
+        tRow++;
+      }
+    }
+
+    // Fill remaining tooltip rows
+    for (; tRow < tp + tH - 1; tRow++) {
+      fillLine(tRow, tooltipX + 1, tooltipW - 2, C.bgTooltip);
+    }
+  }
+
+  // ── Command buffer line ──────────────────────────────────────────────────────
+  const cmdRow = H - 3;
+  fillLine(cmdRow, 1, W, C.bgPanel, '─');
+  fillLine(cmdRow + 1, 1, W, C.bgPanel);
+  out(ansi.move(cmdRow + 1, 2) + C.bgPanel + C.fgAccent + '$ ' + C.reset);
+  out(C.bgPanel + C.fgCmd + ansi.bold + (state.cmdBuffer || ansi.dim + C.fgDim + '(select an item and press Enter to compose, or type your flags)') + C.reset);
+
+  // ── Status bar ───────────────────────────────────────────────────────────────
+  const stRow = H - 1;
+  fillLine(stRow, 1, W, C.bgPanel);
+  const count = `${items.length} items`;
+  const keys = ' ↑↓ navigate  |  Tab: switch tab  |  /: search  |  Enter: add to cmd  |  X: execute cmd  |  Esc: clear  |  q: quit ';
+  out(ansi.move(stRow, 2) + C.bgPanel + C.fgDim + count + '  ' + C.fgBorder + keys + C.reset);
+
+  out(ansi.showCursor);
+}
+
+// ─── Input handling ───────────────────────────────────────────────────────────
+function handleKey(key) {
+  const items = activeItems();
+  const maxIdx = Math.max(0, items.length - 1);
+
+  // Search mode: type chars
+  if (state.searchMode) {
+    if (key === '\x1b' || key === '\r') {
+      state.searchMode = false;
+      if (key === '\x1b') state.searchStr = '';
+      state.selectedIdx = 0;
+    } else if (key === '\x7f' || key === '\b') {
+      state.searchStr = state.searchStr.slice(0, -1);
+      state.selectedIdx = 0;
+    } else if (key.length === 1 && key >= ' ') {
+      state.searchStr += key;
+      state.selectedIdx = 0;
+    }
+    render(); return;
+  }
+
+  // Normal mode
+  if (key === 'q' || key === '\x03') { exit(); return; }
+  if (key === '/') { state.searchMode = true; render(); return; }
+
+  if (key === '\x1b[A' || key === 'k') { // up
+    state.selectedIdx = state.selectedIdx > 0 ? state.selectedIdx - 1 : maxIdx;
+    render(); return;
+  }
+  if (key === '\x1b[B' || key === 'j') { // down
+    state.selectedIdx = state.selectedIdx < maxIdx ? state.selectedIdx + 1 : 0;
+    render(); return;
+  }
+  if (key === '\t') { // tab: switch tabs
+    state.tabIdx = (state.tabIdx + 1) % TABS.length;
+    state.selectedIdx = 0;
+    state.searchStr = '';
+    render(); return;
+  }
+  if (key === '\x1b[Z') { // shift-tab: switch tabs backwards
+    state.tabIdx = (state.tabIdx + TABS.length - 1) % TABS.length;
+    state.selectedIdx = 0;
+    state.searchStr = '';
+    render(); return;
+  }
+  if (key === '\r') { // enter: append selection to cmd buffer
+    const sel = items[state.selectedIdx];
+    if (sel) {
+      // Determine base: command name or flag
+      const baseToken = sel.name.replace(/ .*$/, ''); // take first word token only for flags
+      const isCmdTab = state.tabIdx === 0;
+      const isSlash = state.tabIdx === 2;
+      if (isSlash) {
+        state.cmdBuffer = sel.name;
+      } else if (isCmdTab) {
+        // For commands, build the selected command text
+        const parts = sel.name.split(' ');
+        state.cmdBuffer = parts.join(' ');
+        if (sel.args) state.cmdBuffer += ' ';
+      } else {
+        // For flags, append to buffer
+        state.cmdBuffer = (state.cmdBuffer.startsWith(provider.bin) ? state.cmdBuffer : provider.bin) +
+          ' ' + baseToken;
+        if (sel.args) state.cmdBuffer += ' ';
+      }
+    }
+    render(); return;
+  }
+  if (key === 'x' || key === 'X') { // X: execute
+    if (state.cmdBuffer.trim()) {
+      executeCmdBuffer();
+    }
+    return;
+  }
+  if (key === '\x1b') { // Esc: clear search/buffer
+    if (state.searchStr) { state.searchStr = ''; state.selectedIdx = 0; }
+    else state.cmdBuffer = '';
+    render(); return;
+  }
+  if (key === '\x7f' || key === '\b') { // backspace: trim cmd buffer
+    state.cmdBuffer = state.cmdBuffer.slice(0, -1);
+    render(); return;
+  }
+  // Typing chars when not in search mode → append to cmd buffer
+  if (key.length === 1 && key >= ' ') {
+    if (!state.cmdBuffer) state.cmdBuffer = provider.bin + ' ';
+    state.cmdBuffer += key;
+    render(); return;
+  }
+}
+
+function executeCmdBuffer() {
+  // Leave alt screen, run command
+  out(ansi.altLeave + ansi.showCursor);
+  process.stdin.setRawMode(false);
+  process.stdin.pause();
+
+  const cmd = state.cmdBuffer.trim();
+  console.log('\n' + C.fgAccent + '⚡ Running: ' + C.reset + cmd + '\n');
+
+  const parts = cmd.split(/\s+/);
+  const bin = parts[0];
+  const args = parts.slice(1);
+
+  const result = spawnSync(bin, args, {
+    stdio: 'inherit',
+    shell: false,
+  });
+
+  console.log('\n' + C.fgDim + '─── Press any key to return to tuai ───' + C.reset);
+  process.stdin.setRawMode(true);
+  process.stdin.resume();
+  process.stdin.once('data', () => {
+    state.cmdBuffer = '';
+    out(ansi.altEnter);
+    render();
+  });
+}
+
+function exit() {
+  out(ansi.altLeave + ansi.showCursor + C.reset);
+  process.stdin.setRawMode(false);
+  process.stdin.pause();
+  process.exit(0);
+}
+
+// ─── Bootstrap ────────────────────────────────────────────────────────────────
+function main() {
+  if (!process.stdin.isTTY) {
+    console.error('tuai: must be run in an interactive terminal');
+    process.exit(1);
+  }
+
+  // Enter alt screen
+  out(ansi.altEnter + ansi.hideCursor);
+
+  readline.emitKeypressEvents(process.stdin);
+  process.stdin.setRawMode(true);
+  process.stdin.resume();
+  process.stdin.setEncoding('utf8');
+
+  process.stdin.on('data', (key) => handleKey(key));
+
+  render();
+
+  process.on('SIGINT', exit);
+  process.on('SIGTERM', exit);
+  process.on('exit', () => {
+    out(ansi.altLeave + ansi.showCursor + C.reset);
+  });
+}
+
+main();

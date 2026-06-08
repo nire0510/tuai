@@ -1,0 +1,38 @@
+{
+  "name": "tuai",
+  "version": "1.0.0",
+  "description": "Interactive TUI autocomplete wrapper for AI CLIs like Claude Code, Cursor, Antigravity, and more.",
+  "bin": {
+    "tuai": "./tuai"
+  },
+  "files": [
+    "tuai",
+    "providers"
+  ],
+  "preferGlobal": true,
+  "scripts": {
+    "prepack": "chmod +x tuai",
+    "lint": "eslint --fix .",
+    "start": "node tuai claude"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "cursor",
+    "antigravity",
+    "cli",
+    "autocomplete",
+    "tui"
+  ],
+  "author": "Nir",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.4.1",
+    "globals": "^17.6.0"
+  }
+}
