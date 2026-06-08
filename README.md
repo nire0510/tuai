@@ -38,7 +38,7 @@ Supported providers:
 From npm:
 
 ```bash
-npm install -g tuai
+npm install -g @nire0510/tuai
 ```
 
 From this repository folder:
