@@ -41,6 +41,20 @@ For each page:
 - Map each entry to the provider schema above.
 - Do not invent entries not found in the documentation.
 
+**Handling subcommands:** When a command has subcommands (e.g., `claude auth` → `login`, `logout`, `status`), create **both** a parent entry and individual entries for each subcommand:
+
+1. Parent entry — use the group name as `name`, describe it as a command group, list available subcommands in `detail`, and leave `args` empty. Example:
+   ```js
+   { name: 'claude auth', args: '', desc: 'Authentication commands', detail: 'Subcommand group for authentication. Subcommands: login, logout, status.', example: 'claude auth login\nclaude auth status' }
+   ```
+
+2. Subcommand entries — use the **full path** as `name` (e.g., `claude auth login`, not just `login`), describe the specific subcommand, and populate `args`, `detail`, and `example` for each. Example:
+   ```js
+   { name: 'claude auth login', args: '', desc: 'Sign in to your account', detail: '...', example: 'claude auth login' }
+   ```
+
+Subcommands at any depth follow the same rule — `claude mcp add` would have both a `claude mcp` entry and a `claude mcp add` entry. Check `providers/cursor.js` and `providers/claude.js` for reference implementations.
+
 ### 3. Choose a theme
 
 Pick a cohesive color theme that reflects the provider's brand identity (website colors, logo palette). The theme object requires these keys — all RGB triples `[r, g, b]`:
