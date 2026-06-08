@@ -7,8 +7,8 @@ const commands = [
     example: 'claude'
   },
   {
-    name: 'claude "<query>"',
-    args: '<query>',
+    name: 'claude',
+    args: '"<query>"',
     desc: 'Start interactive session with initial prompt',
     detail: 'Starts an interactive session and pre-fills Claude with the given prompt. Useful for jumping straight into a specific task.',
     example: 'claude "explain this project structure"'

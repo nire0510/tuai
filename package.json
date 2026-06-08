@@ -1,6 +1,6 @@
 {
   "name": "@nire0510/tuai",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Interactive TUI autocomplete wrapper for AI CLIs like Claude Code, Cursor, Antigravity, Copilot, and more.",
   "bin": {
     "tuai": "tuai"
