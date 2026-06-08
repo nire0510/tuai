@@ -1,3 +1,8 @@
+---
+name: provider-doc-sync
+description: Keep provider catalogs in providers/*.js synchronized with the latest public CLI documentation. Use this when verifying or updating provider command, flag, or slash-command metadata from upstream docs.
+---
+
 # Provider Doc Sync Skill
 
 ## Purpose
